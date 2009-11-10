@@ -28,6 +28,7 @@
 (require 'auto-complete)
 
 (defvar ac-anything-point nil)
+(defvar ac-anything-prefix nil)
 (defvar ac-anything-limit 10000)
 
 (defvar ac-anything-source-template
@@ -35,11 +36,14 @@
     (candidate-transformer ac-anything-candidate-highligher)
     (action . ac-anything-action)))
 
+(when (require 'anything-show-completion nil t)
+  (use-anything-show-completion 'ac-anything '(length ac-anything-prefix)))
 
 (defun ac-anything ()
   (interactive)
   (let ((candidates (ac-anything-candidates)))
     (setq ac-anything-point ac-point)
+    (setq ac-anything-prefix ac-prefix)
     (ac-abort)
     (anything (list (ac-anything-source candidates)))))
 
