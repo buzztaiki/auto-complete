@@ -31,6 +31,10 @@
 (defvar ac-anything-prefix nil)
 (defvar ac-anything-limit 10000)
 
+(defvar ac-anything-advice-list
+  '((anything-mark-current-line after ac-anything)
+    (asc-display-overlay after ac-anything)))
+
 (defvar ac-anything-source-template
   '((name . "Auto Complete")
     (candidate-transformer ac-anything-candidate-highligher)
@@ -45,7 +49,21 @@
     (setq ac-anything-point ac-point)
     (setq ac-anything-prefix ac-prefix)
     (ac-abort)
-    (anything (list (ac-anything-source candidates)))))
+    (unwind-protect
+	(progn
+	  (ac-anything-enable-advices)
+	  (anything (list (ac-anything-source candidates))))
+      (ac-anything-disable-advices))))
+
+(defun ac-anything-enable-advices ()
+  (dolist (advice ac-anything-advice-list)
+    (apply 'ad-enable-advice advice)
+    (ad-activate (car advice))))
+
+(defun ac-anything-disable-advices ()
+  (dolist (advice ac-anything-advice-list)
+    (apply 'ad-disable-advice advice)
+    (ad-activate (car advice))))
 
 (defun ac-anything-candidates ()
   (mapcar 
@@ -57,7 +75,7 @@
 	      (cons 'text text)
 	      (cons 'action (ac-get-candidate-action x))
 	      (cons 'face (ac-get-candidate-property 'face x))
-	      (cons 'face (ac-get-candidate-property 'selection-face x))))))
+	      (cons 'selection-face (ac-get-candidate-property 'selection-face x))))))
    (let ((ac-limit ac-anything-limit))
      (ac-candidates))))
 
@@ -80,6 +98,22 @@
   (let ((action (assoc-default 'action candidate)))
     (when action
       (funcall action))))
+
+(defun ac-anything-selection-face (selection)
+  (or (assoc-default 'selection-face selection)
+      'ac-selection-face))
+  
+
+(defadvice anything-mark-current-line (after ac-anything 
+					     disable)
+  (overlay-put anything-selection-overlay 
+	       'face (ac-anything-selection-face (anything-get-selection))))
+
+(defadvice asc-display-overlay (after ac-anything 
+				      (selection) 
+				      disable)
+  (overlay-put asc-overlay
+	       'face (ac-anything-selection-face selection)))
 
 (provide 'auto-complete-anything)
 ;;; auto-complete-anything.el ends here
