@@ -22,9 +22,11 @@
 
 ;; For example, if you want to use company-elisp for auto-complete, put following to your .emacs:
 ;;
-;;	(require 'ac-company)
-;;	(ac-company-define-source ac-source-company-elisp company-elisp)
-;;	(add-to-list 'ac-sources 'ac-source-company-elisp)
+;; (require 'ac-company)
+;; (ac-company-define-source ac-source-company-elisp company-elisp)
+;; (add-hook 'emacs-lisp-mode-hook
+;;        (lambda () 
+;;          (add-to-list 'ac-sources 'ac-source-company-elisp)))
 
 
 ;;; Code:
@@ -42,7 +44,7 @@
   (when (fboundp backend)
     (let ((prefix (funcall backend 'prefix)))
       (when (stringp prefix) 
-	(- (point) (length prefix))))))
+        (- (point) (length prefix))))))
 
 (defun ac-company-candidates (backend)
   (funcall backend 'candidates ac-prefix))
