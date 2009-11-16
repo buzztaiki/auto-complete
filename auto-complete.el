@@ -639,6 +639,7 @@ that have been made before in this function."
   (interactive)
   (let* ((candidate (ac-get-selected-candidate))
          (action (ac-get-candidate-action candidate)))
+    (ac-expander-delete)
     (ac-expand-string candidate)
     (ac-abort)
     (if action
@@ -682,6 +683,12 @@ that have been made before in this function."
             (setq ac-menu (pulldown-create ac-point preferred-width ac-menu-height))))
         (ac-update-candidates 0 0)
         (not (null ac-candidates))))))
+
+(defun ac-start-and-expand (&optional nomessage)
+  "Start completion and expand common part."
+  (interactive (list t))
+  (ac-start nomessage)
+  (ac-expand-common))
 
 (defun ac-stop ()
   "Stop completiong."
