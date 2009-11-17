@@ -535,6 +535,12 @@ You can not use it in source definition like (prefix . `NAME')."
         (ac-activate-mode-map))
     (setq ac-completing nil)
     (ac-deactivate-mode-map))
+  (let* ((completion (try-completion ac-prefix ac-candidates))
+	 (same-as-prefix (and (stringp completion)
+                              (car (member completion ac-candidates)))))
+    (when same-as-prefix
+      (setq ac-candidates (cons same-as-prefix
+				(delete same-as-prefix ac-candidates)))))
   (ac-expander-update)
   (pulldown-set-list ac-menu ac-candidates)
   (pulldown-draw ac-menu))
