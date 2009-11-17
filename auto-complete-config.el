@@ -420,7 +420,7 @@
 ;; BBDB sources
 (defvar ac-bbdb-header-list '("to" "from" "cc" "bcc"))
 
-(defun ac-bbdb-candidate ()
+(defun ac-bbdb-candidates ()
   (delete-dups
    (apply
     'append
@@ -449,7 +449,7 @@
 	(and (/= pos (point)) (point))))))
 
 (defvar ac-source-bbdb
-  '((candidates . ac-bbdb-candidate)
+  '((candidates . ac-bbdb-candidates)
     (match . substring)
     (prefix . ac-bbdb-prefix)))
 
