@@ -448,7 +448,9 @@
 			 (not (= (point) (point-min))))
 	       (forward-line -1))
 	     (looking-at (concat (regexp-opt ac-bbdb-header-list t) ":"))))
-      (ac-prefix-symbol))))
+      (let ((pos (point)))
+	(skip-syntax-backward "w.")
+	(and (/= pos (point)) (point))))))
 
 (defvar ac-source-bbdb
   '((candidates . ac-bbdb-candidate)
