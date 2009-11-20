@@ -239,6 +239,10 @@ If you specify `nil', never be started automatically."
   "Prefix string.")
 (defvaralias 'ac-target 'ac-prefix)
 
+(defvar ac-common-part nil
+  "Common part string of candidates.
+If there is no common part, this will be nil.")
+  
 (defvar ac-limit 0
   "Limit number of candidates for each sources.")
 
@@ -327,6 +331,7 @@ requires REQUIRES-NUM
   "Default prefix definition function."
   (require 'thingatpt)
   (car-safe (bounds-of-thing-at-point 'symbol)))
+(defalias 'ac-prefix-default 'ac-prefix-symbol)
 
 (defun ac-prefix-file ()
   "File prefix."
@@ -376,7 +381,7 @@ You can not use it in source definition like (prefix . `NAME')."
              (real
               (add-attribute 'prefix real))
              ((null prefix)
-              (add-attribute 'prefix 'ac-prefix-symbol)
+              (add-attribute 'prefix 'ac-prefix-default)
               (add-attribute 'requires 1))))
           ;; match
           (let ((match (assq 'match source)))
@@ -418,11 +423,11 @@ You can not use it in source definition like (prefix . `NAME')."
       (expander-hide ac-expander)))
 
 (defun ac-expander-update ()
-  (let ((string (try-completion ac-prefix ac-candidates)))
-    (if (and (stringp string)
-             (> (length string) (length ac-prefix)))
-        (ac-expander-show (point) (substring string (length ac-prefix)))
-      (ac-expander-delete))))
+  (setq ac-common-part (try-completion ac-prefix ac-candidates))
+  (if (and (stringp ac-common-part)
+           (> (length ac-common-part) (length ac-prefix)))
+      (ac-expander-show (point) (substring ac-common-part (length ac-prefix)))
+    (ac-expander-delete)))
 
 (defun ac-activate-mode-map ()
   "Activate `ac-completing-map'. This cause `ac-completing' to be used temporaly."
@@ -468,7 +473,7 @@ You can not use it in source definition like (prefix . `NAME')."
 
         if (equal prefix determined-prefix) do (push source sources)
 
-        finally return (and point (cons point (nreverse sources)))))
+        finally return (and point (list determined-prefix point (nreverse sources)))))
 
 (defun ac-init ()
   "Initialize current sources to start completion."
@@ -493,21 +498,20 @@ You can not use it in source definition like (prefix . `NAME')."
          (cache (and do-cache (assq source ac-candidates-cache)))
          (candidates (cdr cache)))
     (unless cache
-      (setq candidates
-            (mapcar (lambda (candidate)
-                      (pulldown-item-propertize (pulldown-x-to-string candidate)
-                                                'action action
-                                                'menu-face face
-                                                'selection-face selection-face))
-                    (save-excursion
-                      (cond
-                       ((functionp function)
-                        (funcall function))
-                       (t
-                        (eval function))))))
+      (setq candidates (save-excursion
+                         (cond
+                          ((functionp function)
+                           (funcall function))
+                          (t
+                           (eval function)))))
       (when do-cache
         (push (cons source candidates) ac-candidates-cache)))
-    (setq candidates (funcall (assoc-default 'match source) ac-prefix candidates))
+    (setq candidates (mapcar (lambda (candidate)
+                               (pulldown-item-propertize (pulldown-x-to-string candidate)
+                                                         'action action
+                                                         'menu-face face
+                                                         'selection-face selection-face))
+                             (funcall (assoc-default 'match source) ac-prefix candidates)))
     ;; Remove extra items regarding to ac-limit
     (if (and (> ac-limit 1) (> (length candidates) ac-limit))
         (setcdr (nthcdr (1- ac-limit) candidates) nil))
@@ -535,13 +539,13 @@ You can not use it in source definition like (prefix . `NAME')."
         (ac-activate-mode-map))
     (setq ac-completing nil)
     (ac-deactivate-mode-map))
-  (let* ((completion (try-completion ac-prefix ac-candidates))
-	 (same-as-prefix (and (stringp completion)
-                              (car (member completion ac-candidates)))))
-    (when same-as-prefix
-      (setq ac-candidates (cons same-as-prefix
-				(delete same-as-prefix ac-candidates)))))
   (ac-expander-update)
+  (when (and ac-common-part
+             (member ac-common-part ac-candidates))
+    ;; TODO general implementation
+    ;; Move common-part candidate to the first.
+    (setq ac-candidates (cons ac-common-part
+                              (delete ac-common-part ac-candidates))))
   (pulldown-set-list ac-menu ac-candidates)
   (pulldown-draw ac-menu))
 
@@ -609,7 +613,12 @@ that have been made before in this function."
   "Start auto-completion at current point."
   (interactive)
   (ac-abort)
-  (ac-start))
+  (ac-start)
+  ;; TODO Not to cause inline completion to be disrupted.
+  (if (ac-expander-live-p)
+      (expander-hide ac-expander))
+  (ac-expand-common)
+  t)
 
 (defun ac-next ()
   "Select next candidate."
@@ -647,18 +656,17 @@ that have been made before in this function."
   (interactive)
   (if (and ac-dwim ac-dwim-enable)
       (ac-complete)
-    (when (ac-expander-live-p)
-      (let ((string (concat ac-prefix (expander-string ac-expander))))
-        (ac-expander-delete)
-        (ac-expand-string string (eq last-command this-command))
-        string))))
+    (when (and (ac-expander-live-p)
+               ac-common-part)
+      (ac-expand-string ac-common-part (eq last-command this-command))
+      (setq ac-common-part nil)
+      t)))
 
 (defun ac-complete ()
   "Try complete."
   (interactive)
   (let* ((candidate (ac-get-selected-candidate))
          (action (ac-get-candidate-action candidate)))
-    (ac-expander-delete)
     (ac-expand-string candidate)
     (ac-abort)
     (if action
@@ -671,11 +679,13 @@ that have been made before in this function."
   (if (not auto-complete-mode)
     (message "auto-complete-mode is not enabled")
     (let* ((info (ac-prefix))
-           (point (car info))
-           (sources (cdr info))
+           (prefix (nth 0 info))
+           (point (nth 1 info))
+           (sources (nth 2 info))
            (init (not (eq ac-point point))))
       (if (or (null point)
-              (and (integerp ac-auto-start)
+              (and (eq prefix 'ac-prefix-default) ; if not omni-completion
+                   (integerp ac-auto-start)
                    (< (- (point) point)
                       ac-auto-start)))
           (prog1 nil
@@ -702,12 +712,6 @@ that have been made before in this function."
             (setq ac-menu (pulldown-create ac-point preferred-width ac-menu-height))))
         (ac-update-candidates 0 0)
         (not (null ac-candidates))))))
-
-(defun ac-start-and-expand (&optional nomessage)
-  "Start completion and expand common part."
-  (interactive (list t))
-  (ac-start nomessage)
-  (ac-expand-common))
 
 (defun ac-stop ()
   "Stop completiong."
@@ -758,12 +762,7 @@ that have been made before in this function."
   (interactive "P")
   (or (and (or force
                (ac-trigger-command-p last-command))
-           (ac-start t)
-           (prog1 t
-             ;; TODO Not to cause inline completion to be disrupted.
-             (if (ac-expander-live-p)
-                 (expander-hide ac-expander))
-             (ac-expand-common)))
+           (auto-complete))
       ;; borrowed from yasnippet.el
       (let* ((auto-complete-mode nil)
              (keys-1 (this-command-keys-vector))
@@ -794,8 +793,6 @@ that have been made before in this function."
   (if (and (not (minibufferp (current-buffer)))
            (memq major-mode ac-modes))
       (auto-complete-mode 1)))
-
-(require 'easy-mmode)
 
 (defun ac-setup ()
   (make-local-variable 'ac-clear-variables-after-save)
@@ -914,13 +911,13 @@ that have been made before in this function."
 
 (defvar ac-source-symbols
   '((init . (unless ac-symbols-cache
-              (setq ac-symbols-cache (loop for x being the symbols collect x))))
+              (setq ac-symbols-cache (loop for x being the symbols collect (symbol-name x)))))
     (candidates . ac-symbols-cache)
     (cache))
   "Source for Emacs lisp symbols.")
 
 (defvar ac-source-abbrev
-  '((candidates . (append (vconcat [""] local-abbrev-table global-abbrev-table) nil))
+  '((candidates . (mapcar 'prin1-to-string (append (vconcat local-abbrev-table global-abbrev-table) nil)))
     (action . expand-abbrev)
     (cache))
   "Source for abbrev.")
@@ -993,7 +990,7 @@ that have been made before in this function."
 `LIST' is a list of string.
 This is useful if you just want to define a dictionary/keywords source."
   `(defvar ,name
-     '((candidates . (list ,list))
+     '((candidates . (list ,@list))
        (cache))))
 
 (provide 'auto-complete)
