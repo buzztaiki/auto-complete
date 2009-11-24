@@ -408,12 +408,26 @@
 ;; Eclim sources
 
 (defun ac-eclim-candidates ()
-  (loop for c in (eclim/java-complete)
-        collect (nth 1 c)))
+  (when eclim-auto-save (save-buffer))
+  (let ((ret
+	 (loop for c in (eclim/java-complete)
+	       collect (nth 1 c))))
+    (when (car ret)
+      ret)))
+
+(defun ac-eclim-prefix ()
+  (or
+   (save-excursion
+     (ac-prefix-c-dot))
+   (save-excursion
+     (when (and (< (skip-chars-backward "_a-zA-Z0-9") 0)
+		(looking-at "[A-Z]"))
+       (point)))))
 
 (defvar ac-source-eclim
   '((candidates . ac-eclim-candidates)
-    (prefix . c-dot)))
+    (prefix . ac-eclim-prefix)
+    (cache . t)))
 
 
 
