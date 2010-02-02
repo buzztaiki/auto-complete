@@ -32,7 +32,7 @@
 ;;; Code:
 
 (require 'auto-complete)
-(require 'company)
+(require 'company nil t)
 
 (defmacro ac-company-define-source (name backend)
   `(defvar ,name

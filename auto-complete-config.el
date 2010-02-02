@@ -411,7 +411,8 @@
 ;; Eclim sources
 
 (defun ac-eclim-candidates ()
-  (when eclim-auto-save (save-buffer))
+  (when eclim-auto-save
+    (save-buffer))
   (let ((ret
 	 (loop for c in (eclim/java-complete)
 	       collect (nth 1 c))))
