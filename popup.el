@@ -393,6 +393,8 @@ See also `popup-item-propertize'."
   nil)
 
 (defun popup-draw (popup)
+  (unless (popup-list popup)
+    (error "popup-list is empty"))
   (loop with height = (popup-height popup)
         with min-height = (popup-min-height popup)
         with popup-face = (popup-face popup)
