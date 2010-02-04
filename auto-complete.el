@@ -813,20 +813,24 @@ that have been made before in this function."
 
 (defun ac-set-timer ()
   (unless ac-timer
-    (setq ac-timer (run-with-idle-timer ac-delay ac-delay 'ac-update))))
+    (setq ac-timer (run-with-idle-timer ac-delay ac-delay 
+                                        (lambda () (ac-update nil t))))))
 
 (defun ac-cancel-timer ()
   (when (timerp  ac-timer)
     (cancel-timer ac-timer)
     (setq ac-timer nil)))
 
-(defun ac-update (&optional force)
+(defun ac-update (&optional force nomessage)
   (when (and auto-complete-mode
              (or ac-triggered
                  force)
              (not isearch-mode))
-    (progn
-      (setq ac-candidates (ac-candidates))
+    (setq ac-candidates (ac-candidates))
+    (if (not ac-candidates)
+        (prog1 nil
+          (ac-abort)
+          (unless nomessage (message "Nothing to complete")))
       (let ((preferred-width (popup-preferred-width ac-candidates)))
         ;; Reposition if needed
         (when (or (null ac-menu)
@@ -836,7 +840,8 @@ that have been made before in this function."
                        (ac-menu-at-wrapper-line-p)))
           (ac-menu-delete)
           (ac-menu-create ac-point preferred-width ac-menu-height)))
-      (ac-update-candidates 0 0))))
+      (ac-update-candidates 0 0)
+      t)))
 
 (defun ac-set-quick-help-timer ()
   (unless ac-quick-help-timer
@@ -875,11 +880,11 @@ that have been made before in this function."
   "Start auto-completion at current point."
   (interactive)
   (ac-abort)
-  (when (ac-start)
-    (ac-update t)
+  (when (and (ac-start)
+             (ac-update t))
     ;; TODO Not to cause inline completion to be disrupted.
     (if (ac-inline-live-p)
-	(ac-inline-hide))
+        (ac-inline-hide))
     (ac-expand-common)
     t))
 
