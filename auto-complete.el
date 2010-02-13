@@ -624,38 +624,34 @@ You can not use it in source definition like (prefix . `NAME')."
 (defun ac-prefix ()
   "Return a pair of POINT of prefix and SOURCES to be applied."
   (loop with point
-        with current-point
-        with omni
+        with determined-prefix
         with sources
         for source in (ac-compiled-sources)
         for prefix = (assoc-default 'prefix source)
 
-        do
+        if (null determined-prefix) do
         (save-excursion
-          (setq current-point
-                (cond
-                 ((symbolp prefix)
-                  (funcall prefix))
-                 ((stringp prefix)
-                  (and (re-search-backward (concat prefix "\\=") nil t)
-                       (or (match-beginning 1) (match-beginning 0))))
-                 ((stringp (car-safe prefix))
-                  (let ((regexp (nth 0 prefix))
-                        (end (nth 1 prefix))
-                        (group (nth 2 prefix)))
-                    (and (re-search-backward (concat regexp "\\=") nil t)
-                         (funcall (if end 'match-end 'match-beginning)
-                                  (or group 0)))))
-                 (t
-                  (eval prefix))))
-          (when (null point)
-            (setq point current-point))
-          (when (and current-point point)
-            (setq omni (or omni
-                           (not (eq prefix 'ac-prefix-default))))
-            (when (= current-point point)
-              (push source sources))))
-        finally return (and point (list omni point (nreverse sources)))))
+          (setq point (cond
+                       ((symbolp prefix)
+                        (funcall prefix))
+                       ((stringp prefix)
+                        (and (re-search-backward (concat prefix "\\=") nil t)
+                             (or (match-beginning 1) (match-beginning 0))))
+                       ((stringp (car-safe prefix))
+                        (let ((regexp (nth 0 prefix))
+                              (end (nth 1 prefix))
+                              (group (nth 2 prefix)))
+                          (and (re-search-backward (concat regexp "\\=") nil t)
+                               (funcall (if end 'match-end 'match-beginning)
+                                        (or group 0)))))
+                       (t
+                        (eval prefix))))
+          (if point
+              (setq determined-prefix prefix)))
+
+        if (equal prefix determined-prefix) do (push source sources)
+
+        finally return (and point (list determined-prefix point (nreverse sources)))))
 
 (defun ac-init ()
   "Initialize current sources to start completion."
@@ -943,12 +939,12 @@ that have been made before in this function."
   (if (not auto-complete-mode)
       (message "auto-complete-mode is not enabled")
     (let* ((info (ac-prefix))
-           (omni (nth 0 info))
+           (prefix (nth 0 info))
            (point (nth 1 info))
            (sources (nth 2 info))
            (init (not (eq ac-point point))))
       (if (or (null point)
-              (and omni
+              (and (eq prefix 'ac-prefix-default) ; if not omni-completion
                    (integerp ac-auto-start)
                    (< (- (point) point)
                       ac-auto-start)))
