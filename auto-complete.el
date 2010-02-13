@@ -875,13 +875,13 @@ that have been made before in this function."
   "Start auto-completion at current point."
   (interactive)
   (ac-abort)
-  (when (ac-start)
-    (ac-update t)
-    ;; TODO Not to cause inline completion to be disrupted.
-    (if (ac-inline-live-p)
-	(ac-inline-hide))
-    (ac-expand-common)
-    t))
+  (ac-start)
+  (ac-update t)
+  ;; TODO Not to cause inline completion to be disrupted.
+  (if (ac-inline-live-p)
+      (ac-inline-hide))
+  (ac-expand-common)
+  t)
 
 (defun ac-next ()
   "Select next candidate."
